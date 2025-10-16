@@ -1,17 +1,13 @@
-#ifndef AST_H
-#define AST_H
+#ifndef PARSER_H
+#define PARSER_H
 
 #include <stdbool.h>
 #include "token.h" // 引入 Token 定义，因为 AST 节点会引用它
 
 // 前向声明，解决结构体之间的循环引用
-typedef struct Type Type;
 typedef struct Obj Obj;
 typedef struct Node Node;
-
-
-// --- 1. 类型系统 (Type System) ---
-// ------------------------------------
+typedef struct Type Type;
 
 // 类型种类的枚举
 typedef enum {
@@ -42,6 +38,29 @@ struct Type {
     Type *params;    // 函数参数类型列表 (链表)
     Type *next;      // 链表中的下一个参数
 };
+
+// --- 全局基本类型对象 ---
+// 通过 extern 关键字，让其他文件可以访问这些在 type.c 中定义的全局变量
+extern Type *ty_void;
+extern Type *ty_bool;
+extern Type *ty_int;
+extern Type *ty_float;
+extern Type *ty_double;
+
+
+// --- 类型系统函数 ---
+
+// 初始化类型系统，创建上述全局基本类型对象
+void types_init(void);
+
+// 创建一个数组类型
+// base: 数组元素的基本类型
+// len:  数组的长度
+Type *array_of(Type *base, int len);
+
+// 创建一个函数类型
+// return_ty: 函数的返回类型
+Type *func_type(Type *return_ty);
 
 // --- 2. 对象/符号 (Objects/Symbols) ---
 // ------------------------------------
@@ -147,8 +166,6 @@ struct Node {
     bool b_val;
 };
 
-// --- AST 构造辅助函数 ---
-
 Node *new_node(NodeKind kind, Token *tok);
 Node *new_binary(NodeKind kind, Node *lhs, Node *rhs, Token *tok);
 Node *new_unary(NodeKind kind, Node *lhs, Token *tok);
@@ -158,4 +175,14 @@ Node *new_num_double(double val, Token *tok);
 Node *new_bool(bool val, Token *tok);
 Node *new_var_node(Obj *var, Token *tok);
 
-#endif // AST_H
+// 为一个 AST 节点添加类型信息。
+// 这是语义分析的核心函数之一，它会根据节点的种类和子节点的类型来推导当前节点的类型。
+void add_type(Node *node);
+
+// --- 主解析函数 ---
+//
+// 输入: 从词法分析器获得的 Token 链表的头节点
+// 输出: 一个 Obj 链表，代表了程序中所有的全局变量和函数
+Obj *parse(Token *tok);
+
+#endif // PARSER_H
