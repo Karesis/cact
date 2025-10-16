@@ -1,7 +1,8 @@
 #include <stdio.h>
 #include "str.h"
 #include "lexer.h"
-#include "parser.h" // 包含了所有 AST 和 Parser 的定义
+#include "parser.h"
+#include "error.h"
 
 // 一个非常简单的递归函数，用于以树状结构打印 AST，方便调试
 void print_ast(Node *node, int indent) {
@@ -12,22 +13,38 @@ void print_ast(Node *node, int indent) {
 
     // 根据节点类型打印信息
     switch(node->kind) {
-        case ND_ADD: printf("+\n"); break;
-        case ND_SUB: printf("-\n"); break;
-        case ND_MUL: printf("*\n"); break;
-        case ND_DIV: printf("/\n"); break;
-        case ND_ASSIGN: printf("=\n"); break;
-        case ND_VAR: printf("Var: %s\n", node->var->name); break;
-        case ND_NUM_INT: printf("Int: %d\n", node->i_val); break;
+        // Expressions
+        case ND_ADD:       printf("+\n"); break;
+        case ND_SUB:       printf("-\n"); break;
+        case ND_MUL:       printf("*\n"); break;
+        case ND_DIV:       printf("/\n"); break;
+        case ND_MOD:       printf("%%\n"); break;
+        case ND_NEG:       printf("Unary -\n"); break;
+        case ND_EQ:        printf("==\n"); break;
+        case ND_NE:        printf("!=\n"); break;
+        case ND_LT:        printf("<\n"); break;
+        case ND_LE:        printf("<=\n"); break;
+        case ND_LOG_AND:   printf("&&\n"); break;
+        case ND_LOG_OR:    printf("||\n"); break;
+        case ND_LOG_NOT:   printf("!\n"); break;
+        case ND_ASSIGN:    printf("=\n"); break;
+        case ND_VAR:       printf("Var: %s\n", node->var->name); break;
+        case ND_NUM_INT:   printf("Int: %d\n", node->i_val); break;
         case ND_NUM_FLOAT: printf("Float: %f\n", node->f_val); break;
-        case ND_NUM_DOUBLE: printf("Double: %f\n", node->d_val); break;
-        case ND_BOOL: printf("Bool: %s\n", node->b_val ? "true" : "false"); break;
-        case ND_IF: printf("If\n"); break;
-        case ND_WHILE: printf("While\n"); break;
-        case ND_BLOCK: printf("Block\n"); break;
+        case ND_NUM_DOUBLE:printf("Double: %f\n", node->d_val); break;
+        case ND_BOOL:      printf("Bool: %s\n", node->b_val ? "true" : "false"); break;
         case ND_FUNC_CALL: printf("Call: %s\n", node->func_name); break;
-        case ND_RETURN: printf("Return\n"); break;
+        case ND_ARRAY_ACCESS: printf("ArrayAccess\n"); break;
+
+        // Statements
+        case ND_RETURN:    printf("Return\n"); break;
+        case ND_IF:        printf("If\n"); break;
+        case ND_WHILE:     printf("While\n"); break;
+        case ND_BLOCK:     printf("Block\n"); break;
+        case ND_BREAK:     printf("Break\n"); break;
+        case ND_CONTINUE:  printf("Continue\n"); break;
         case ND_EXPR_STMT: printf("ExprStmt\n"); break;
+        
         default: printf("Unknown Node Kind: %d\n", node->kind);
     }
 
@@ -37,6 +54,7 @@ void print_ast(Node *node, int indent) {
     print_ast(node->cond, indent + 1);
     print_ast(node->then, indent + 1);
     print_ast(node->els, indent + 1);
+    print_ast(node->index, indent + 1);
 
     // 对于语句块或函数调用，遍历其 body 或 args 链表
     if (node->kind == ND_BLOCK) {
@@ -53,6 +71,7 @@ void print_ast(Node *node, int indent) {
     print_ast(node->next, indent);
 }
 
+
 int main(int argc, char **argv) {
     if (argc != 2) {
         fprintf(stderr, "用法: %s <文件名.cact>\n", argv[0]);
@@ -65,17 +84,18 @@ int main(int argc, char **argv) {
         return 1;
     }
 
+    // --- 初始化错误报告系统 ---
+    //init_error_reporting(content.body, argv[1]);
+
     // --- 2. 词法分析 ---
     printf("--- 1. 词法分析 ---\n");
     Token *tok = tokenize(content, argv[1]);
     printf("词法分析完成.\n\n");
 
-
     // --- 3. 语法分析 ---
     printf("--- 2. 语法分析 ---\n");
     Obj *prog = parse(tok);
     printf("语法分析完成.\n\n");
-
 
     // --- 4. 打印结果 (用于调试) ---
     printf("--- 3. 程序结构 ---\n");
