@@ -344,8 +344,12 @@ static Node *logor() {
 static Node *assign() {
     Node *node = logor();
     Token *tok = peek();
-    if (consume(TK_ASSIGN))
-        node = new_binary(ND_ASSIGN, node, assign(), tok);
+    if (consume(TK_ASSIGN)) {
+        // 修改点：右侧不再是 assign()，而是一个不允许赋值的表达式
+        // 这就禁止了 a = b = c 的情况
+        Node *rhs = logor(); 
+        node = new_binary(ND_ASSIGN, node, rhs, tok);
+    }
     return node;
 }
 
