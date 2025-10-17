@@ -22,6 +22,7 @@ static void function(void);
 static Node *declaration(void);
 static Node *stmt(void);
 static Node *expr(void);
+static Node *const_expr(void);
 static Node *assign(void);
 static Node *logor(void);
 static Node *logand(void);
@@ -357,6 +358,19 @@ static Node *expr() {
     return assign();
 }
 
+// 一个新的、严格的解析函数
+static Node *const_expr() {
+    Token *tok = peek();
+    if (consume(TK_NUM_INT))   return new_num_int(tok->val.i_val, tok);
+    if (consume(TK_NUM_FLOAT)) return new_num_float(tok->val.f_val, tok);
+    if (consume(TK_NUM_DOUBLE))return new_num_double(tok->val.d_val, tok);
+    if (consume(TK_LIT_BOOL))  return new_bool(tok->val.b_val, tok);
+
+    // 如果不是以上任何一种，就说明语法错误
+    error_tok(tok, "expected a constant expression (literal value)");
+    return NULL; // Unreachable
+}
+
 static Node *stmt() {
     Token *tok = peek();
     if (consume(TK_IF)) {
@@ -470,7 +484,7 @@ static Node *declaration() {
             if (peek()->kind == TK_L_BRACE) {
                 rhs = initializer_list(peek());
             } else {
-                rhs = expr();
+                rhs = const_expr();
             }
             Node *assign_node = new_binary(ND_ASSIGN, new_var_node(var, start_tok), rhs, start_tok);
             cur->next = new_unary(ND_EXPR_STMT, assign_node, start_tok);
