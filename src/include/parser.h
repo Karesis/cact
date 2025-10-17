@@ -114,6 +114,7 @@ typedef enum {
     ND_NUM_FLOAT, // Float literal
     ND_NUM_DOUBLE,// Double literal
     ND_BOOL,      // Boolean literal
+    ND_INIT_LIST, // 代表 { ... } 初始化列表
     ND_FUNC_CALL, // Function call
     ND_ARRAY_ACCESS, // Array access, e.g., arr[i]
 

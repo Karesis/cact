@@ -31,6 +31,7 @@ static Node *add(void);
 static Node *mul(void);
 static Node *unary(void);
 static Node *primary(void);
+static Node *initializer_list(Token *tok);
 
 // --- 作用域和符号管理 ---
 static void enter_scope(void) {
@@ -147,6 +148,31 @@ static bool is_typename(void) {
 
 
 // --- 递归下降解析函数 ---
+
+static Node *initializer_list(Token *tok) {
+    // 创建一个新的节点来代表整个初始化列表
+    Node *node = new_node(ND_INIT_LIST, tok); 
+    expect(TK_L_BRACE);
+
+    Node head = {};
+    Node *cur = &head;
+
+    // 如果不是空列表 `{}`, 就开始解析
+    if (peek()->kind != TK_R_BRACE) {
+        do {
+            // 解析列表中的每一个元素
+            // 用 assign() 可以解析 '1'，'a+b' 等各种表达式
+            cur->next = assign(); 
+            cur = cur->next;
+        } while (consume(TK_COMMA));
+    }
+    
+    expect(TK_R_BRACE);
+
+    // 将链表挂到新节点的 body 或其他字段上
+    node->body = head.next;
+    return node;
+}
 
 static Node *primary() {
     Token *tok;
@@ -406,7 +432,17 @@ static Node *declaration() {
         var = new_gvar(name, ty, is_const);
 
     if (consume(TK_ASSIGN)) {
-        Node *node = new_binary(ND_ASSIGN, new_var_node(var, tok), expr(), tok);
+        // --- 修改开始 ---
+        Node *rhs;
+        if (peek()->kind == TK_L_BRACE) {
+            // 如果是 '{'，调用新的初始化列表解析函数
+            rhs = initializer_list(tok); 
+        } else {
+            // 否则，保持原来的逻辑，解析单个表达式
+            rhs = expr();
+        }
+
+        Node *node = new_binary(ND_ASSIGN, new_var_node(var, tok), rhs, tok);
         expect(TK_SEMICOLON);
         return new_unary(ND_EXPR_STMT, node, tok);
     }
