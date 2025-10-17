@@ -33,6 +33,8 @@ static Node *unary(void);
 static Node *primary(void);
 static Node *initializer_list(Token *tok);
 
+static void add_builtin_function(char *name, Type *return_ty, Type *params_ty);
+
 // --- 作用域和符号管理 ---
 static void enter_scope(void) {
     Scope *sc = calloc(1, sizeof(Scope));
@@ -72,6 +74,16 @@ static Obj *new_lvar(char *name, Type *ty, bool is_const) {
         var->next = current_fn->locals;
         current_fn->locals = var;
     }
+    push_var(var);
+    return var;
+}
+
+// 这是一个只创建 Obj 并将其添加到当前作用域的辅助函数
+// 它不处理 locals 链表
+static Obj *new_param(char *name, Type *ty) {
+    Obj *var = new_var(name, ty, false); // is_const is false for params
+    var->is_local = true;
+    // 注意：这里不再有修改 current_fn->locals 的代码
     push_var(var);
     return var;
 }
@@ -407,48 +419,73 @@ static Node *stmt() {
 }
 
 static Node *declaration() {
-    Token *tok = peek();
+    Token *start_tok = peek();
     bool is_const = consume(TK_CONST);
 
-    Type *ty = consume_btype();
-    if (!ty)
-        error_tok(tok, "expected a type specifier");
+    // 1. 先解析出所有变量共享的基础类型
+    Type *base_ty = consume_btype();
+    if (!base_ty)
+        error_tok(start_tok, "expected a type specifier");
 
-    // TODO: This only supports one declaration per line for now.
-    char *name = get_ident();
+    // 2. 使用 "dummy head" 技巧来构建一个语句链表
+    //    因为 `int i, j=5;` 实际上是两个独立的声明+赋值语句
+    Node head = {};
+    Node *cur = &head;
+    int count = 0;
 
-    while(consume(TK_L_BRACKET)) {
-        Token* len_tok = peek();
-        if(!consume(TK_NUM_INT))
-            error_tok(len_tok, "array size must be an integer constant");
-        ty = array_of(ty, len_tok->val.i_val);
-        expect(TK_R_BRACKET);
-    }
-    
-    Obj *var;
-    if (current_fn)
-        var = new_lvar(name, ty, is_const);
-    else
-        var = new_gvar(name, ty, is_const);
-
-    if (consume(TK_ASSIGN)) {
-        // --- 修改开始 ---
-        Node *rhs;
-        if (peek()->kind == TK_L_BRACE) {
-            // 如果是 '{'，调用新的初始化列表解析函数
-            rhs = initializer_list(tok); 
-        } else {
-            // 否则，保持原来的逻辑，解析单个表达式
-            rhs = expr();
+    // 3. 使用 do-while 循环来处理至少一个 VarDef
+    do {
+        // count > 0 意味着这不是第一个变量，前面必须有逗号
+        if (count > 0) {
+            expect(TK_COMMA);
         }
 
-        Node *node = new_binary(ND_ASSIGN, new_var_node(var, tok), rhs, tok);
-        expect(TK_SEMICOLON);
-        return new_unary(ND_EXPR_STMT, node, tok);
-    }
+        // --- 以下是解析单个 VarDef 的逻辑 ---
+        char *name = get_ident();
+        Type *ty = base_ty; // 每个变量的类型都从基础类型开始
 
+        // 处理数组部分
+        while(consume(TK_L_BRACKET)) {
+            Token* len_tok = peek();
+            if(!consume(TK_NUM_INT))
+                error_tok(len_tok, "array size must be an integer constant");
+            ty = array_of(ty, len_tok->val.i_val);
+            expect(TK_R_BRACKET);
+        }
+        
+        // 创建变量对象
+        Obj *var;
+        if (current_fn)
+            var = new_lvar(name, ty, is_const);
+        else
+            var = new_gvar(name, ty, is_const);
+
+        // 处理可选的初始化部分
+        if (consume(TK_ASSIGN)) {
+            Node *rhs;
+            if (peek()->kind == TK_L_BRACE) {
+                rhs = initializer_list(peek());
+            } else {
+                rhs = expr();
+            }
+            Node *assign_node = new_binary(ND_ASSIGN, new_var_node(var, start_tok), rhs, start_tok);
+            cur->next = new_unary(ND_EXPR_STMT, assign_node, start_tok);
+            cur = cur->next;
+        } else {
+            cur->next = new_node(ND_EXPR_STMT, start_tok);
+            cur = cur->next; 
+        }
+        count++;
+
+    // 4. 循环条件：如果下一个是逗号，就继续循环
+    } while (peek()->kind == TK_COMMA);
+
+    // 5. 循环结束后，期望一个分号
     expect(TK_SEMICOLON);
-    return new_node(ND_EXPR_STMT, tok);
+
+    // 6. 返回构建好的语句链表的头节点
+    // 如果没有任何初始化语句，head.next 会是 NULL，也是正确的
+    return head.next;
 }
 
 static void function() {
@@ -480,16 +517,30 @@ static void function() {
         do {
             Type* param_ty = consume_btype();
             char* param_name = get_ident();
-            while(consume(TK_L_BRACKET)) {
-                if(!consume(TK_R_BRACKET)) { // Optional size for params
-                    expect(TK_NUM_INT);
+            // 1. 用 'if' 语句处理第一个可选的维度 ['[' IntConst? ']']
+            if (consume(TK_L_BRACKET)) {
+                int len = -1; // -1 代表省略的长度
+                
+                // 检查方括号内是否为空
+                if (peek()->kind == TK_NUM_INT) {
+                    Token *len_tok = consume_tok();
+                    len = len_tok->val.i_val;
+                }
+                expect(TK_R_BRACKET);
+                param_ty = array_of(param_ty, len);
+
+                // 2. 用 'while' 循环处理所有后续的、必须有长度的维度 {'[' IntConst ']'}
+                while (consume(TK_L_BRACKET)) {
+                    Token *len_tok = peek();
+                    // 根据规范，后续维度必须有长度 
+                    expect(TK_NUM_INT); 
+                    param_ty = array_of(param_ty, len_tok->val.i_val);
                     expect(TK_R_BRACKET);
                 }
-                param_ty = array_of(param_ty, -1);
             }
 
             p_cur = p_cur->next = param_ty;
-            o_cur = o_cur->next = new_lvar(param_name, param_ty, false);
+            o_cur = o_cur->next = new_param(param_name, param_ty);
         } while (consume(TK_COMMA));
         expect(TK_R_PAREN);
     }
@@ -556,6 +607,34 @@ Obj *parse(Token *tok) {
     types_init();
     enter_scope(); // Global scope
 
+    // 3. 预加载所有内置的运行时库函数
+    
+    // print_int(int)
+    Type *p_int = ty_int;
+    add_builtin_function("print_int", ty_void, p_int);
+
+    // print_float(float)
+    Type *p_float = ty_float;
+    add_builtin_function("print_float", ty_void, p_float);
+    
+    // print_double(double)
+    Type *p_double = ty_double;
+    add_builtin_function("print_double", ty_void, p_double);
+
+    // print_bool(bool)
+    Type *p_bool = ty_bool;
+    add_builtin_function("print_bool", ty_void, p_bool);
+
+    // get_int() - no params
+    add_builtin_function("get_int", ty_int, NULL);
+
+    // get_float() - no params
+    add_builtin_function("get_float", ty_float, NULL);
+    
+    // get_double() - no params
+    add_builtin_function("get_double", ty_double, NULL);
+
+
     while (peek()->kind != TK_EOF) {
         if (is_function()) {
             function();
@@ -568,3 +647,19 @@ Obj *parse(Token *tok) {
     return globals;
 }
 
+// 放在你的 new_gvar 或类似函数附近
+// name: 函数名
+// return_ty: 函数的返回类型
+// params_ty: 一个 Type* 的链表，代表参数类型
+static void add_builtin_function(char *name, Type *return_ty, Type *params_ty) {
+    // 1. 创建函数类型
+    Type *ty = func_type(return_ty);
+    ty->params = params_ty;
+
+    // 2. 创建代表函数的 Obj (符号)
+    //    这里的 is_const=false, is_local=false 都是默认值
+    Obj *fn = new_gvar(name, ty, false); 
+    fn->is_function = true;
+
+    // 注意：内置函数没有函数体(body)和局部变量(locals)，所以这些字段保持 NULL
+}
