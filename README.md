@@ -99,5 +99,4 @@ Instead of managing the lifecycle of individual AST nodes with `malloc`/`free`, 
 
 ## License
 
-This project is developed for the Compiler Principles course.
-Copyright 2025 Karesis. All rights reserved.
+This project is licensed under the **Apache-2.0 License**. See the [LICENSE](./LICENSE) file for details.
