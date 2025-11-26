@@ -9,11 +9,12 @@
 #include "hash.h"
 #include "str.h"
 
-// Lexer的内部状态
-static struct {
-    str source;           // 源代码的字符串视图
-    const char *filename; // 文件名，用于报错
-    char *current;        // 指向当前正在扫描的字符
+// Lexer inner status
+static struct 
+{
+    str source;           // source codes view
+    const char *filename; // filename for err report
+    char *current;        // current char
     int row;              // 当前行号
     int col;              // 当前列号
     Token *head;          // Token 链表的头

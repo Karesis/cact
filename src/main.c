@@ -4,14 +4,13 @@
 #include "parser.h"
 #include "error.h"
 
-// 一个非常简单的递归函数，用于以树状结构打印 AST，方便调试
+// print ast for test
 void print_ast(Node *node, int indent) {
     if (!node) return;
 
-    // 打印缩进
+    // indent
     for (int i = 0; i < indent; i++) printf("  ");
 
-    // 根据节点类型打印信息
     switch(node->kind) {
         // Expressions
         case ND_ADD:       printf("+\n"); break;
@@ -48,7 +47,7 @@ void print_ast(Node *node, int indent) {
         default: printf("Unknown Node Kind: %d\n", node->kind);
     }
 
-    // 递归打印子节点
+    // recursive for child nodes
     print_ast(node->lhs, indent + 1);
     print_ast(node->rhs, indent + 1);
     print_ast(node->cond, indent + 1);
@@ -56,7 +55,7 @@ void print_ast(Node *node, int indent) {
     print_ast(node->els, indent + 1);
     print_ast(node->index, indent + 1);
 
-    // 对于语句块或函数调用，遍历其 body 或 args 链表
+    // for block and funciton
     if (node->kind == ND_BLOCK) {
         for(Node* n = node->body; n; n = n->next) {
             print_ast(n, indent + 1);
@@ -67,52 +66,52 @@ void print_ast(Node *node, int indent) {
         }
     }
 
-    // 打印同一层级的下一条语句
+    // print next 
     print_ast(node->next, indent);
 }
 
 
 int main(int argc, char **argv) {
     if (argc != 2) {
-        fprintf(stderr, "用法: %s <文件名.cact>\n", argv[0]);
+        fprintf(stderr, "usage: %s <filename.cact>\n", argv[0]);
         return 1;
     }
 
-    // --- 1. 读取文件 ---
+    // --- 1. read file ---
     str content = str_fread(argv[1]);
     if (content.body == NULL) {
         return 1;
     }
 
-    // --- 初始化错误报告系统 ---
+    // --- init the reporting system ---
     //init_error_reporting(content.body, argv[1]);
 
-    // --- 2. 词法分析 ---
-    printf("--- 1. 词法分析 ---\n");
+    // --- 2. lex ---
+    printf("--- 1. Lexing ---\n");
     Token *tok = tokenize(content, argv[1]);
-    printf("词法分析完成.\n\n");
+    printf("Lexing done.\n\n");
 
-    // --- 3. 语法分析 ---
-    printf("--- 2. 语法分析 ---\n");
+    // --- 3. parse ---
+    printf("--- 2. Parsing ---\n");
     Obj *prog = parse(tok);
-    printf("语法分析完成.\n\n");
+    printf("Parsing done.\n\n");
 
-    // --- 4. 打印结果 (用于调试) ---
-    printf("--- 3. 程序结构 ---\n");
+    // --- 4. print ---
+    printf("--- 3. Program Arch ---\n");
     for (Obj *obj = prog; obj; obj = obj->next) {
         if (!obj->is_function) {
-            printf("全局变量: %s\n", obj->name);
+            printf("Global value: %s\n", obj->name);
         } else {
-            printf("函数: %s\n", obj->name);
-            printf("  参数:\n");
+            printf("function: %s\n", obj->name);
+            printf("  args:\n");
             if (!obj->params) {
-                printf("    (无)\n");
+                printf("    (None)\n");
             } else {
                 for (Obj* p = obj->params; p; p=p->next) {
                     printf("    - %s\n", p->name);
                 }
             }
-            printf("  函数体:\n");
+            printf("  function body:\n");
             print_ast(obj->body, 2);
         }
         printf("\n");

@@ -9,7 +9,8 @@
 // --- Parser 状态 ---
 static Token *current_token;
 typedef struct Scope Scope;
-struct Scope {
+struct Scope
+{
     Scope *next;
     HashMap vars;
 };
@@ -37,18 +38,22 @@ static Node *initializer_list(Token *tok);
 static void add_builtin_function(char *name, Type *return_ty, Type *params_ty);
 
 // --- 作用域和符号管理 ---
-static void enter_scope(void) {
+static void enter_scope(void)
+{
     Scope *sc = calloc(1, sizeof(Scope));
     sc->next = scope;
     scope = sc;
 }
 
-static void leave_scope(void) {
+static void leave_scope(void)
+{
     scope = scope->next;
 }
 
-static Obj *find_var(Token *tok) {
-    for (Scope *sc = scope; sc; sc = sc->next) {
+static Obj *find_var(Token *tok)
+{
+    for (Scope *sc = scope; sc; sc = sc->next)
+    {
         Obj *var = hashmap_get2(&sc->vars, tok->loc, tok->len);
         if (var)
             return var;
@@ -56,11 +61,13 @@ static Obj *find_var(Token *tok) {
     return NULL;
 }
 
-static void push_var(Obj *var) {
-    hashmap_put( &scope->vars, var->name, var);
+static void push_var(Obj *var)
+{
+    hashmap_put(&scope->vars, var->name, var);
 }
 
-static Obj *new_var(char *name, Type *ty, bool is_const) {
+static Obj *new_var(char *name, Type *ty, bool is_const)
+{
     Obj *var = calloc(1, sizeof(Obj));
     var->name = name;
     var->ty = ty;
@@ -68,10 +75,12 @@ static Obj *new_var(char *name, Type *ty, bool is_const) {
     return var;
 }
 
-static Obj *new_lvar(char *name, Type *ty, bool is_const) {
+static Obj *new_lvar(char *name, Type *ty, bool is_const)
+{
     Obj *var = new_var(name, ty, is_const);
     var->is_local = true;
-    if (current_fn) {
+    if (current_fn)
+    {
         var->next = current_fn->locals;
         current_fn->locals = var;
     }
@@ -81,7 +90,8 @@ static Obj *new_lvar(char *name, Type *ty, bool is_const) {
 
 // 这是一个只创建 Obj 并将其添加到当前作用域的辅助函数
 // 它不处理 locals 链表
-static Obj *new_param(char *name, Type *ty) {
+static Obj *new_param(char *name, Type *ty)
+{
     Obj *var = new_var(name, ty, false); // is_const is false for params
     var->is_local = true;
     // 注意：这里不再有修改 current_fn->locals 的代码
@@ -89,7 +99,8 @@ static Obj *new_param(char *name, Type *ty) {
     return var;
 }
 
-static Obj *new_gvar(char *name, Type *ty, bool is_const) {
+static Obj *new_gvar(char *name, Type *ty, bool is_const)
+{
     Obj *var = new_var(name, ty, is_const);
     var->next = globals;
     globals = var;
@@ -100,20 +111,24 @@ static Obj *new_gvar(char *name, Type *ty, bool is_const) {
 // --- Parser 辅助函数 ---
 
 // 查看当前 Token
-static Token *peek(void) {
+static Token *peek(void)
+{
     return current_token;
 }
 
 // 消耗当前 Token 并前进到下一个
-static Token *consume_tok(void) {
+static Token *consume_tok(void)
+{
     Token *tok = current_token;
     current_token = current_token->next;
     return tok;
 }
 
 // 检查当前 token 是否为预期类型，如果是则消耗它并返回 true
-static bool consume(TokenKind kind) {
-    if (peek()->kind == kind) {
+static bool consume(TokenKind kind)
+{
+    if (peek()->kind == kind)
+    {
         consume_tok();
         return true;
     }
@@ -121,14 +136,16 @@ static bool consume(TokenKind kind) {
 }
 
 // 检查当前 token 是否为预期类型，如果是则消耗它，否则报错
-static void expect(TokenKind kind) {
+static void expect(TokenKind kind)
+{
     if (peek()->kind != kind)
         error_tok(peek(), "expected token %d, but got %d", kind, peek()->kind);
     consume_tok();
 }
 
 // 提取标识符的名字
-static char *get_ident(void) {
+static char *get_ident(void)
+{
     if (peek()->kind != TK_IDENT)
         error_tok(peek(), "expected an identifier");
     Token *tok = consume_tok();
@@ -138,48 +155,58 @@ static char *get_ident(void) {
 }
 
 // 解析一个基本类型 (不消耗 token)
-static Type* peek_btype() {
+static Type *peek_btype()
+{
     TokenKind kind = peek()->kind;
-    if (kind == TK_INT) return ty_int;
-    if (kind == TK_FLOAT) return ty_float;
-    if (kind == TK_DOUBLE) return ty_double;
-    if (kind == TK_BOOL) return ty_bool;
+    if (kind == TK_INT)
+        return ty_int;
+    if (kind == TK_FLOAT)
+        return ty_float;
+    if (kind == TK_DOUBLE)
+        return ty_double;
+    if (kind == TK_BOOL)
+        return ty_bool;
     return NULL;
 }
 
 // 解析一个基本类型 (消耗 token)
-static Type* consume_btype() {
+static Type *consume_btype()
+{
     Type *ty = peek_btype();
-    if(ty) consume_tok();
+    if (ty)
+        consume_tok();
     return ty;
 }
 
 // 判断当前 token 是否是类型说明符的开始
-static bool is_typename(void) {
+static bool is_typename(void)
+{
     return peek_btype() || peek()->kind == TK_CONST || peek()->kind == TK_VOID;
 }
 
-
 // --- 递归下降解析函数 ---
 
-static Node *initializer_list(Token *tok) {
+static Node *initializer_list(Token *tok)
+{
     // 创建一个新的节点来代表整个初始化列表
-    Node *node = new_node(ND_INIT_LIST, tok); 
+    Node *node = new_node(ND_INIT_LIST, tok);
     expect(TK_L_BRACE);
 
     Node head = {};
     Node *cur = &head;
 
     // 如果不是空列表 `{}`, 就开始解析
-    if (peek()->kind != TK_R_BRACE) {
-        do {
+    if (peek()->kind != TK_R_BRACE)
+    {
+        do
+        {
             // 解析列表中的每一个元素
             // 用 assign() 可以解析 '1'，'a+b' 等各种表达式
-            cur->next = assign(); 
+            cur->next = assign();
             cur = cur->next;
         } while (consume(TK_COMMA));
     }
-    
+
     expect(TK_R_BRACE);
 
     // 将链表挂到新节点的 body 或其他字段上
@@ -187,39 +214,49 @@ static Node *initializer_list(Token *tok) {
     return node;
 }
 
-static Node *primary() {
+static Node *primary()
+{
     Token *tok;
 
-    if (consume(TK_L_PAREN)) {
+    if (consume(TK_L_PAREN))
+    {
         Node *node = expr();
         expect(TK_R_PAREN);
         return node;
     }
 
     tok = peek();
-    if (consume(TK_NUM_INT))   return new_num_int(tok->val.i_val, tok);
-    if (consume(TK_NUM_FLOAT)) return new_num_float(tok->val.f_val, tok);
-    if (consume(TK_NUM_DOUBLE))return new_num_double(tok->val.d_val, tok);
-    if (consume(TK_LIT_BOOL))  return new_bool(tok->val.b_val, tok);
+    if (consume(TK_NUM_INT))
+        return new_num_int(tok->val.i_val, tok);
+    if (consume(TK_NUM_FLOAT))
+        return new_num_float(tok->val.f_val, tok);
+    if (consume(TK_NUM_DOUBLE))
+        return new_num_double(tok->val.d_val, tok);
+    if (consume(TK_LIT_BOOL))
+        return new_bool(tok->val.b_val, tok);
 
     tok = peek();
-    if (tok->kind == TK_IDENT) {
+    if (tok->kind == TK_IDENT)
+    {
         Token *name_tok = consume_tok();
-        
-        if (peek()->kind == TK_L_PAREN) {
+
+        if (peek()->kind == TK_L_PAREN)
+        {
             consume_tok(); // consume '('
             Node *node = new_node(ND_FUNC_CALL, name_tok);
             node->func_name = strndup(name_tok->loc, name_tok->len);
-            
-            Obj* fn = find_var(name_tok);
+
+            Obj *fn = find_var(name_tok);
             if (!fn || !fn->is_function)
                 error_tok(name_tok, "function '%s' not declared", node->func_name);
             node->var = fn;
-            
+
             Node head = {};
             Node *cur = &head;
-            if (!consume(TK_R_PAREN)) {
-                do {
+            if (!consume(TK_R_PAREN))
+            {
+                do
+                {
                     cur->next = assign();
                     cur = cur->next;
                 } while (consume(TK_COMMA));
@@ -232,11 +269,12 @@ static Node *primary() {
         Obj *var = find_var(name_tok);
         if (!var)
             error_tok(name_tok, "variable '%.*s' not declared", name_tok->len, name_tok->loc);
-        
+
         Node *node = new_var_node(var, name_tok);
-        
-        while(peek()->kind == TK_L_BRACKET) {
-            Token* start_tok = consume_tok();
+
+        while (peek()->kind == TK_L_BRACKET)
+        {
+            Token *start_tok = consume_tok();
             Node *parent = new_node(ND_ARRAY_ACCESS, start_tok);
             parent->lhs = node;
             parent->index = expr();
@@ -245,13 +283,14 @@ static Node *primary() {
         }
         return node;
     }
-    
+
     error_tok(tok, "expected an expression");
     return NULL; // unreachable
 }
 
-static Node *unary() {
-    Token* tok;
+static Node *unary()
+{
+    Token *tok;
     if (consume(TK_PLUS))
         return primary();
     tok = peek();
@@ -262,9 +301,11 @@ static Node *unary() {
     return primary();
 }
 
-static Node *mul() {
+static Node *mul()
+{
     Node *node = unary();
-    for (;;) {
+    for (;;)
+    {
         Token *tok = peek();
         if (consume(TK_STAR))
             node = new_binary(ND_MUL, node, unary(), tok);
@@ -277,9 +318,11 @@ static Node *mul() {
     }
 }
 
-static Node *add() {
+static Node *add()
+{
     Node *node = mul();
-    for (;;) {
+    for (;;)
+    {
         Token *tok = peek();
         if (consume(TK_PLUS))
             node = new_binary(ND_ADD, node, mul(), tok);
@@ -290,9 +333,11 @@ static Node *add() {
     }
 }
 
-static Node *relational() {
+static Node *relational()
+{
     Node *node = add();
-    for (;;) {
+    for (;;)
+    {
         Token *tok = peek();
         if (consume(TK_LT))
             node = new_binary(ND_LT, node, add(), tok);
@@ -307,9 +352,11 @@ static Node *relational() {
     }
 }
 
-static Node *equality() {
+static Node *equality()
+{
     Node *node = relational();
-    for (;;) {
+    for (;;)
+    {
         Token *tok = peek();
         if (consume(TK_EQ))
             node = new_binary(ND_EQ, node, relational(), tok);
@@ -320,9 +367,11 @@ static Node *equality() {
     }
 }
 
-static Node *logand() {
+static Node *logand()
+{
     Node *node = equality();
-    for(;;) {
+    for (;;)
+    {
         Token *tok = peek();
         if (consume(TK_LOG_AND))
             node = new_binary(ND_LOG_AND, node, equality(), tok);
@@ -331,9 +380,11 @@ static Node *logand() {
     }
 }
 
-static Node *logor() {
+static Node *logor()
+{
     Node *node = logand();
-    for(;;) {
+    for (;;)
+    {
         Token *tok = peek();
         if (consume(TK_LOG_OR))
             node = new_binary(ND_LOG_OR, node, logand(), tok);
@@ -342,38 +393,48 @@ static Node *logor() {
     }
 }
 
-static Node *assign() {
+static Node *assign()
+{
     Node *node = logor();
     Token *tok = peek();
-    if (consume(TK_ASSIGN)) {
+    if (consume(TK_ASSIGN))
+    {
         // 修改点：右侧不再是 assign()，而是一个不允许赋值的表达式
         // 这就禁止了 a = b = c 的情况
-        Node *rhs = logor(); 
+        Node *rhs = logor();
         node = new_binary(ND_ASSIGN, node, rhs, tok);
     }
     return node;
 }
 
-static Node *expr() {
+static Node *expr()
+{
     return assign();
 }
 
 // 一个新的、严格的解析函数
-static Node *const_expr() {
+static Node *const_expr()
+{
     Token *tok = peek();
-    if (consume(TK_NUM_INT))   return new_num_int(tok->val.i_val, tok);
-    if (consume(TK_NUM_FLOAT)) return new_num_float(tok->val.f_val, tok);
-    if (consume(TK_NUM_DOUBLE))return new_num_double(tok->val.d_val, tok);
-    if (consume(TK_LIT_BOOL))  return new_bool(tok->val.b_val, tok);
+    if (consume(TK_NUM_INT))
+        return new_num_int(tok->val.i_val, tok);
+    if (consume(TK_NUM_FLOAT))
+        return new_num_float(tok->val.f_val, tok);
+    if (consume(TK_NUM_DOUBLE))
+        return new_num_double(tok->val.d_val, tok);
+    if (consume(TK_LIT_BOOL))
+        return new_bool(tok->val.b_val, tok);
 
     // 如果不是以上任何一种，就说明语法错误
     error_tok(tok, "expected a constant expression (literal value)");
     return NULL; // Unreachable
 }
 
-static Node *stmt() {
+static Node *stmt()
+{
     Token *tok = peek();
-    if (consume(TK_IF)) {
+    if (consume(TK_IF))
+    {
         Node *node = new_node(ND_IF, tok);
         expect(TK_L_PAREN);
         node->cond = expr();
@@ -384,7 +445,8 @@ static Node *stmt() {
         return node;
     }
 
-    if (consume(TK_WHILE)) {
+    if (consume(TK_WHILE))
+    {
         Node *node = new_node(ND_WHILE, tok);
         expect(TK_L_PAREN);
         node->cond = expr();
@@ -393,24 +455,31 @@ static Node *stmt() {
         return node;
     }
 
-    if (consume(TK_RETURN)) {
+    if (consume(TK_RETURN))
+    {
         Node *node = new_node(ND_RETURN, tok);
-        if(!consume(TK_SEMICOLON)) {
+        if (!consume(TK_SEMICOLON))
+        {
             node->lhs = expr();
             expect(TK_SEMICOLON);
         }
         return node;
     }
 
-    if (consume(TK_L_BRACE)) {
+    if (consume(TK_L_BRACE))
+    {
         Node *node = new_node(ND_BLOCK, tok);
         Node head = {};
         Node *cur = &head;
         enter_scope();
-        while (!consume(TK_R_BRACE)) {
-            if (is_typename()) {
+        while (!consume(TK_R_BRACE))
+        {
+            if (is_typename())
+            {
                 cur->next = declaration();
-            } else {
+            }
+            else
+            {
                 cur->next = stmt();
             }
             cur = cur->next;
@@ -420,12 +489,14 @@ static Node *stmt() {
         return node;
     }
 
-    if (consume(TK_BREAK)) {
+    if (consume(TK_BREAK))
+    {
         expect(TK_SEMICOLON);
         return new_node(ND_BREAK, tok);
     }
 
-    if (consume(TK_CONTINUE)) {
+    if (consume(TK_CONTINUE))
+    {
         expect(TK_SEMICOLON);
         return new_node(ND_CONTINUE, tok);
     }
@@ -436,7 +507,8 @@ static Node *stmt() {
     return node;
 }
 
-static Node *declaration() {
+static Node *declaration()
+{
     Token *start_tok = peek();
     bool is_const = consume(TK_CONST);
 
@@ -452,9 +524,11 @@ static Node *declaration() {
     int count = 0;
 
     // 3. 使用 do-while 循环来处理至少一个 VarDef
-    do {
+    do
+    {
         // count > 0 意味着这不是第一个变量，前面必须有逗号
-        if (count > 0) {
+        if (count > 0)
+        {
             expect(TK_COMMA);
         }
 
@@ -463,14 +537,15 @@ static Node *declaration() {
         Type *ty = base_ty; // 每个变量的类型都从基础类型开始
 
         // 处理数组部分
-        while(consume(TK_L_BRACKET)) {
-            Token* len_tok = peek();
-            if(!consume(TK_NUM_INT))
+        while (consume(TK_L_BRACKET))
+        {
+            Token *len_tok = peek();
+            if (!consume(TK_NUM_INT))
                 error_tok(len_tok, "array size must be an integer constant");
             ty = array_of(ty, len_tok->val.i_val);
             expect(TK_R_BRACKET);
         }
-        
+
         // 创建变量对象
         Obj *var;
         if (current_fn)
@@ -479,23 +554,29 @@ static Node *declaration() {
             var = new_gvar(name, ty, is_const);
 
         // 处理可选的初始化部分
-        if (consume(TK_ASSIGN)) {
+        if (consume(TK_ASSIGN))
+        {
             Node *rhs;
-            if (peek()->kind == TK_L_BRACE) {
+            if (peek()->kind == TK_L_BRACE)
+            {
                 rhs = initializer_list(peek());
-            } else {
+            }
+            else
+            {
                 rhs = const_expr();
             }
             Node *assign_node = new_binary(ND_ASSIGN, new_var_node(var, start_tok), rhs, start_tok);
             cur->next = new_unary(ND_EXPR_STMT, assign_node, start_tok);
             cur = cur->next;
-        } else {
+        }
+        else
+        {
             cur->next = new_node(ND_EXPR_STMT, start_tok);
-            cur = cur->next; 
+            cur = cur->next;
         }
         count++;
 
-    // 4. 循环条件：如果下一个是逗号，就继续循环
+        // 4. 循环条件：如果下一个是逗号，就继续循环
     } while (peek()->kind == TK_COMMA);
 
     // 5. 循环结束后，期望一个分号
@@ -506,15 +587,19 @@ static Node *declaration() {
     return head.next;
 }
 
-static void function() {
+static void function()
+{
     Token *tok = peek();
     Type *return_ty = ty_void;
-    if(peek()->kind != TK_VOID) {
+    if (peek()->kind != TK_VOID)
+    {
         return_ty = consume_btype();
-    } else {
+    }
+    else
+    {
         consume_tok(); // consume "void"
     }
-    
+
     char *name = get_ident();
     Type *ty = func_type(return_ty);
 
@@ -522,25 +607,29 @@ static void function() {
     fn->is_function = true;
 
     current_fn = fn;
-    
+
     enter_scope();
     expect(TK_L_PAREN);
 
     Type p_head = {};
     Type *p_cur = &p_head;
-    Obj  o_head = {};
+    Obj o_head = {};
     Obj *o_cur = &o_head;
 
-    if (!consume(TK_R_PAREN)) {
-        do {
-            Type* param_ty = consume_btype();
-            char* param_name = get_ident();
+    if (!consume(TK_R_PAREN))
+    {
+        do
+        {
+            Type *param_ty = consume_btype();
+            char *param_name = get_ident();
             // 1. 用 'if' 语句处理第一个可选的维度 ['[' IntConst? ']']
-            if (consume(TK_L_BRACKET)) {
+            if (consume(TK_L_BRACKET))
+            {
                 int len = -1; // -1 代表省略的长度
-                
+
                 // 检查方括号内是否为空
-                if (peek()->kind == TK_NUM_INT) {
+                if (peek()->kind == TK_NUM_INT)
+                {
                     Token *len_tok = consume_tok();
                     len = len_tok->val.i_val;
                 }
@@ -548,10 +637,11 @@ static void function() {
                 param_ty = array_of(param_ty, len);
 
                 // 2. 用 'while' 循环处理所有后续的、必须有长度的维度 {'[' IntConst ']'}
-                while (consume(TK_L_BRACKET)) {
+                while (consume(TK_L_BRACKET))
+                {
                     Token *len_tok = peek();
-                    // 根据规范，后续维度必须有长度 
-                    expect(TK_NUM_INT); 
+                    // 根据规范，后续维度必须有长度
+                    expect(TK_NUM_INT);
                     param_ty = array_of(param_ty, len_tok->val.i_val);
                     expect(TK_R_BRACKET);
                 }
@@ -562,24 +652,28 @@ static void function() {
         } while (consume(TK_COMMA));
         expect(TK_R_PAREN);
     }
-    
+
     fn->ty->params = p_head.next;
     fn->params = o_head.next;
-    
+
     expect(TK_L_BRACE);
 
     Node head = {};
     Node *cur = &head;
 
-    while(!consume(TK_R_BRACE)) {
-        if (is_typename()) {
+    while (!consume(TK_R_BRACE))
+    {
+        if (is_typename())
+        {
             cur->next = declaration();
-        } else {
+        }
+        else
+        {
             cur->next = stmt();
         }
         cur = cur->next;
     }
-    
+
     fn->body = head.next;
     fn->locals = current_fn->locals;
     leave_scope();
@@ -589,9 +683,10 @@ static void function() {
 // 用向前看来判断是函数还是全局变量
 // 语法: type-specifier declarator ...
 // 我们需要向前看到 declarator 后面是不是'('
-static bool is_function(void) {
+static bool is_function(void)
+{
     Token *tok = current_token;
-    
+
     // 跳过类型说明符 (const? btype)
     if (tok->kind == TK_CONST)
         tok = tok->next;
@@ -606,11 +701,14 @@ static bool is_function(void) {
     tok = tok->next;
 
     // 跳过可能的数组声明符 `[]`
-    while (tok->kind == TK_L_BRACKET) {
+    while (tok->kind == TK_L_BRACKET)
+    {
         // 这是一个简化的向前看，我们假设括号是匹配的
         tok = tok->next;
-        if(tok->kind == TK_NUM_INT) tok = tok->next; // skip size
-        if (tok->kind != TK_R_BRACKET) return false;
+        if (tok->kind == TK_NUM_INT)
+            tok = tok->next; // skip size
+        if (tok->kind != TK_R_BRACKET)
+            return false;
         tok = tok->next;
     }
 
@@ -618,15 +716,16 @@ static bool is_function(void) {
     return tok->kind == TK_L_PAREN;
 }
 
-Obj *parse(Token *tok) {
+Obj *parse(Token *tok)
+{
     globals = NULL;
     current_token = tok;
-    
+
     types_init();
     enter_scope(); // Global scope
 
     // 3. 预加载所有内置的运行时库函数
-    
+
     // print_int(int)
     Type *p_int = ty_int;
     add_builtin_function("print_int", ty_void, p_int);
@@ -634,7 +733,7 @@ Obj *parse(Token *tok) {
     // print_float(float)
     Type *p_float = ty_float;
     add_builtin_function("print_float", ty_void, p_float);
-    
+
     // print_double(double)
     Type *p_double = ty_double;
     add_builtin_function("print_double", ty_void, p_double);
@@ -648,19 +747,22 @@ Obj *parse(Token *tok) {
 
     // get_float() - no params
     add_builtin_function("get_float", ty_float, NULL);
-    
+
     // get_double() - no params
     add_builtin_function("get_double", ty_double, NULL);
 
-
-    while (peek()->kind != TK_EOF) {
-        if (is_function()) {
+    while (peek()->kind != TK_EOF)
+    {
+        if (is_function())
+        {
             function();
-        } else {
+        }
+        else
+        {
             declaration();
         }
     }
-    
+
     leave_scope();
     return globals;
 }
@@ -669,14 +771,15 @@ Obj *parse(Token *tok) {
 // name: 函数名
 // return_ty: 函数的返回类型
 // params_ty: 一个 Type* 的链表，代表参数类型
-static void add_builtin_function(char *name, Type *return_ty, Type *params_ty) {
+static void add_builtin_function(char *name, Type *return_ty, Type *params_ty)
+{
     // 1. 创建函数类型
     Type *ty = func_type(return_ty);
     ty->params = params_ty;
 
     // 2. 创建代表函数的 Obj (符号)
     //    这里的 is_const=false, is_local=false 都是默认值
-    Obj *fn = new_gvar(name, ty, false); 
+    Obj *fn = new_gvar(name, ty, false);
     fn->is_function = true;
 
     // 注意：内置函数没有函数体(body)和局部变量(locals)，所以这些字段保持 NULL
