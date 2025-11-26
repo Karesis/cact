@@ -9,7 +9,6 @@ SCHOOL_BRANCH="school"
 SCHOOL_REMOTE="school"
 
 # =================配置区域=================
-# 在这里列出所有的 Submodule 路径，用空格隔开
 SUBMODULE_PATHS=("vendor/fluf" "vendor/calico")
 # =========================================
 
@@ -54,7 +53,7 @@ for path in "${SUBMODULE_PATHS[@]}"; do
     fi
 
     # B. 从 Git 索引中移除 submodule 记录（保留文件）
-    # 注意：如果原本就没有 commit 这个 submodule，这一步会报错，所以前面加了 set -e 保护
+    # 如果原本就没有 commit 这个 submodule，这一步会报错，所以前面加了 set -e 保护
     git rm --cached "$path"
 
     # C. 清理 submodule 内部的 .git 文件夹
@@ -89,4 +88,3 @@ echo "-> 恢复 Submodule 链接..."
 git submodule update --init --recursive
 
 echo "=== 推送完成！ ==="
-echo "School 分支现在包含了 fluf 和 calico 的完整源码。"
