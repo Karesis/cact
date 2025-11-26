@@ -1,3 +1,6 @@
 [submodule "vendor/fluf"]
 	path = vendor/fluf
 	url = git@github.com:Karesis/fluf.git
+[submodule "vendor/calico"]
+	path = vendor/calico
+	url = git@github.com:Karesis/calico.git
