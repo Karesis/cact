@@ -1,0 +1,63 @@
+#ifndef TOK
+#define TOK(ID)
+#endif
+
+#ifndef KW
+#define KW(ID, TEXT) TOK(KW_##ID)
+#endif
+
+#ifndef PUNCT
+#define PUNCT(ID, TEXT) TOK(ID)
+#endif
+
+/// --- Token ---
+
+TOK(EOF)
+TOK(ERROR)
+TOK(IDENT)
+TOK(LIT_INT)
+TOK(LIT_FLOAT)
+TOK(LIT_DOUBLE)
+
+KW(CONST, "const")
+KW(INT, "int")
+KW(BOOL, "bool")
+KW(FLOAT, "float")
+KW(DOUBLE, "double")
+KW(VOID, "void")
+KW(IF, "if")
+KW(ELSE, "else")
+KW(WHILE, "while")
+KW(BREAK, "break")
+KW(CONTINUE, "continue")
+KW(RETURN, "return")
+KW(TRUE, "true")    
+KW(FALSE, "false")
+
+PUNCT(PLUS, "+")
+PUNCT(MINUS, "-")
+PUNCT(STAR, "*")
+PUNCT(SLASH, "/")
+PUNCT(PERCENT, "%")
+PUNCT(EQ, "==")
+PUNCT(NEQ, "!=")
+PUNCT(LT, "<")
+PUNCT(LE, "<=")
+PUNCT(GT, ">")
+PUNCT(GE, ">=")
+PUNCT(L_PAREN, "(")
+PUNCT(R_PAREN, ")")
+PUNCT(L_BRACE, "{")
+PUNCT(R_BRACE, "}")
+PUNCT(L_BRACKET, "[")
+PUNCT(R_BRACKET, "]")
+PUNCT(ASSIGN, "=")
+PUNCT(SEMICOLON, ";")
+PUNCT(COMMA, ",")
+PUNCT(LOG_AND, "&&")
+PUNCT(LOG_OR, "||")
+PUNCT(LOG_NOT, "!")
+
+#undef TOK
+#undef KW
+#undef PUNCT
