@@ -1,49 +1,132 @@
 #include <context.h>
-#include <token.h>
-#include <core/type.h>
+#include <type.h>
 #include <core/msg.h>
-#include <std/strings/intern.h>
-#include <std/map.h>
+#include <core/hash.h>
+#include <stdarg.h>
+#include <stdio.h>
 
-/// fast for just u32
-static u64 _sym_hash(const void *key) {
-    const symbol_t *s = (const symbol_t *)key;
-    return (u64)s->id * 2654435761u; 
+/*
+ * ==========================================================================
+ * 1. Map Operations for symbol_t
+ * ==========================================================================
+ */
+
+static u64 _sym_hash(const void *key)
+{
+	const symbol_t *s = (const symbol_t *)key;
+	return (u64)s->id * 2654435761u;
 }
 
-static bool _sym_eq(const void *lhs, const void *rhs) {
-    return ((const symbol_t *)lhs)->id == ((const symbol_t *)rhs)->id;
+static bool _sym_eq(const void *lhs, const void *rhs)
+{
+	return ((const symbol_t *)lhs)->id == ((const symbol_t *)rhs)->id;
 }
 
-const map_ops_t MAP_OPS_SYMBOL = {
-    .hash = _sym_hash,
-    .equals = _sym_eq,
+static const map_ops_t MAP_OPS_SYMBOL = {
+	.hash = _sym_hash,
+	.equals = _sym_eq,
 };
 
-void context_init(struct Context *ctx, allocer_t alc) {
-    ctx->alc = alc;
-    massert(intern_init(&ctx->itn, alc), "Context init failed");
-    
-    /// init map
-    massert(map_init(ctx->kw_map, alc, MAP_OPS_SYMBOL), "Context::kw_map init failed");
+/*
+ * ==========================================================================
+ * 2. Lifecycle
+ * ==========================================================================
+ */
 
-    symbol_t sym;
-    TokenKind kind;
+void context_init(struct Context *ctx, allocer_t alc)
+{
+	ctx->alc = alc;
+	ctx->had_error = false;
+	ctx->panic_mode = false;
 
-    #define KW(ID, STR) \
-        do { \
-            /* 1. get symbol */ \
-            sym = intern(&ctx->itn, str_from_cstr(STR)); \
-            /* 2. get the Kind */ \
-            kind = TokenKind_##ID; \
-            /* 3. put into map */ \
-            map_put(ctx->kw_map, sym, kind); \
-        } while(0);
+	types_init(alc);
 
-    #include <token.def>
+	if (!srcmanager_init(&ctx->mgr, alc)) {
+		log_panic("Failed to init SourceManager");
+	}
+
+	if (!intern_init(&ctx->itn, alc)) {
+		log_panic("Failed to initialize Interner");
+	}
+
+	if (!map_init(ctx->kw_map, alc, MAP_OPS_SYMBOL)) {
+		log_panic("Failed to initialize KeywordMap");
+	}
+
+	symbol_t sym;
+	TokenKind kind;
+
+#define TOK(ID)
+#define PUNCT(ID, STR)
+
+#define KW(ID, STR)                                                              \
+	do {                                                                     \
+		/* a. 将关键字字符串驻留，获得唯一的 Symbol ID */                \
+		sym = intern(&ctx->itn, str_from_cstr(STR));                     \
+		/* b. 获取对应的枚举值 (假设 token.h 中定义了 TokenKind_##ID) */ \
+		kind = TokenKind_##ID;                                           \
+		/* c. 存入 Map */                                                \
+		map_put(ctx->kw_map, sym, kind);                                 \
+	} while (0);
+
+#include "token.def"
 }
 
-void context_deinit(struct Context *ctx) {
-    map_deinit(ctx->kw_map);
-    intern_deinit(&ctx->itn);
+void context_deinit(struct Context *ctx)
+{
+	map_deinit(ctx->kw_map);
+
+	intern_deinit(&ctx->itn);
+
+	srcmanager_deinit(&ctx->mgr);
+
+	types_deinit(ctx->alc);
+}
+
+/*
+ * ==========================================================================
+ * 3. Error Reporting
+ * ==========================================================================
+ */
+
+void ctx_error(struct Context *ctx, const struct Token *tok, const char *fmt,
+	       ...)
+{
+	if (ctx->panic_mode)
+		return;
+
+	ctx->panic_mode = true;
+	ctx->had_error = true;
+
+	srcloc_t loc = { 0 };
+	bool has_loc = false;
+
+	if (tok) {
+		has_loc = srcmanager_lookup(&ctx->mgr, tok->span.start, &loc);
+	}
+
+	if (has_loc) {
+		fprintf(stderr, "%s:%zu:%zu: Error: ", loc.filename, loc.line,
+			loc.col);
+	} else {
+		fprintf(stderr, "Error: ");
+	}
+
+	va_list ap;
+	va_start(ap, fmt);
+	vfprintf(stderr, fmt, ap);
+	va_end(ap);
+	fprintf(stderr, "\n");
+
+	if (has_loc) {
+		str_t line_content =
+			srcmanager_get_line_content(&ctx->mgr, tok->span.start);
+
+		if (line_content.len > 0) {
+			fprintf(stderr, "    %.*s\n", (int)line_content.len,
+				line_content.ptr);
+
+			fprintf(stderr, "    %*s^\n", (int)(loc.col - 1), "");
+		}
+	}
 }

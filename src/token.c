@@ -8,19 +8,15 @@ str_t tokenkind_to_str(TokenKind kind)
 const char *tokenkind_to_cstr(TokenKind kind)
 {
 	switch (kind) {
-
-		/// keyword
-#define KW(ID, TEXT)        \
+#define KW(ID, TEXT)         \
 	case TokenKind_##ID: \
 		return TEXT;
 
-		/// punctuation
-#define PUNCT(ID, TEXT)  \
+#define PUNCT(ID, TEXT)      \
 	case TokenKind_##ID: \
 		return TEXT;
 
-		/// other tokens
-#define TOK(ID)          \
+#define TOK(ID)              \
 	case TokenKind_##ID: \
 		return "TOKEN_" #ID;
 
@@ -30,5 +26,3 @@ const char *tokenkind_to_cstr(TokenKind kind)
 		return "<UNKNOWN>";
 	}
 }
-
-

@@ -16,12 +16,13 @@ INCLUDES := -Iinclude -Ivendor/fluf/include
 CFLAGS := -g -Wall -Wextra -std=c23 \
           -D_POSIX_C_SOURCE=200809L -D_DEFAULT_SOURCE \
           $(INCLUDES)
+		  # -fsanitize=address -fno-omit-frame-pointer \
 
 # Preprocessor flags: Generate dependency files (.d)
 CPPFLAGS := -MMD -MP
 
 # Linker flags
-LDFLAGS :=
+LDFLAGS := # -fsanitize=address
 LDLIBS :=
 
 # --- Dependencies (Fluf) ---
@@ -78,7 +79,7 @@ INSTALL_BIN := $(PREFIX)/bin
 # Recipes
 # ===========================================================================
 
-.PHONY: all clean install uninstall update run test check
+.PHONY: all clean install uninstall update run test check test_samples
 
 # Default target: Build the compiler binary
 all: $(TARGET_BIN)
@@ -124,6 +125,10 @@ test: $(TEST_BINS)
 	@echo
 	@echo "=== All Tests Passed ==="
 	@echo
+
+test_samples: $(TARGET_BIN)
+	@echo "[TEST]    Running Sample Integration Tests..."
+	@python3 scripts/test_samples.py
 
 # Alias for 'test'
 check: test

@@ -17,15 +17,12 @@
  * Context (for interning strings and keyword lookup).
  */
 struct Lexer {
-    // --- Dependencies ---
-    const srcmanager_t *mgr; /// Source manager for file content & location resolution
-    struct Context *ctx;     /// Compiler context (Interner, KeywordMap)
-    
-    // --- State ---
-    usize file_id;           /// ID of the file being lexed
-    const char* content_start; /// Cached pointer to the start of file content
-    usize content_len;       /// Cached length of the file content
-    usize cursor;            /// Current byte offset in the file
+	struct Context *ctx;
+
+	usize file_id;
+	const char *content_start;
+	usize content_len;
+	usize cursor;
 };
 
 /*
@@ -41,7 +38,7 @@ struct Lexer {
  * @param ctx Pointer to the compiler Context (must remain valid).
  * @param file_id The ID of the file to lex (returned by srcmanager_add).
  */
-void lexer_init(struct Lexer *lex, const srcmanager_t *mgr, struct Context *ctx, usize file_id);
+void lexer_init(struct Lexer *lex, struct Context *ctx, usize file_id);
 
 /**
  * @brief Get the next Token from the stream.
@@ -59,7 +56,6 @@ struct Token lexer_next(struct Lexer *l);
  * If you need this for the Parser, we can implement it later or let the Parser
  * handle the buffering (Parser usually holds `current_token` and `next_token`).
  */
-// struct Token lexer_peek(struct Lexer *l); 
 
 /*
  * ==========================================================================
@@ -73,4 +69,3 @@ struct Token lexer_next(struct Lexer *l);
  * * @note You need to include <std/vec.h> to use this, or forward declare a TokenVec.
  * Let's keep it commented out until you actually need a TokenVec.
  */
-// void lexer_tokenize_all(struct Lexer *l, TokenVec *out_tokens);
